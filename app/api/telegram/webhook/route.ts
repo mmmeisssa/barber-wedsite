@@ -5,18 +5,14 @@ const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 type TelegramUpdate = {
   message?: {
-    chat?: {
-      id?: number;
-    };
+    chat?: { id?: number };
     text?: string;
   };
   callback_query?: {
     id: string;
     data?: string;
     message?: {
-      chat?: {
-        id?: number;
-      };
+      chat?: { id?: number };
     };
   };
 };
@@ -38,17 +34,13 @@ async function telegram(
 ) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
 
-  if (!token) {
-    throw new Error("TELEGRAM_BOT_TOKEN is missing");
-  }
+  if (!token) throw new Error("TELEGRAM_BOT_TOKEN is missing");
 
   const response = await fetch(
     `https://api.telegram.org/bot${token}/${method}`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }
   );
@@ -63,59 +55,27 @@ async function telegram(
   return result;
 }
 
-function formatAppointment(appointment: Appointment) {
+function formatAppointment(a: Appointment) {
   const status =
-    appointment.status === "confirmed"
+    a.status === "confirmed"
       ? "🟢 Confirmed"
-      : appointment.status === "cancelled"
+      : a.status === "cancelled"
         ? "🔴 Cancelled"
-        : `🟡 ${appointment.status}`;
+        : `🟡 ${a.status}`;
 
   return [
-    `👤 ${appointment.name}`,
-    `📞 ${appointment.phone}`,
-    `✂️ ${appointment.service || "Appointment"}`,
-    `💰 $${appointment.price ?? 0}`,
-    `📅 ${appointment.date}`,
-    `⏰ ${appointment.time}`,
+    `👤 ${a.name}`,
+    `📞 ${a.phone}`,
+    `✂️ ${a.service || "Appointment"}`,
+    `💰 $${a.price ?? 0}`,
+    `📅 ${a.date}`,
+    `⏰ ${a.time}`,
     status,
   ].join("\n");
 }
 
-async function getAppointments(
-  startDate?: string,
-  endDate?: string
-) {
-  let query = supabase
-    .from("appointments")
-    .select(
-      "id, name, phone, date, time, service, price, status"
-    )
-    .neq("status", "cancelled")
-    .order("date", { ascending: true })
-    .order("time", { ascending: true });
-
-  if (startDate) {
-    query = query.gte("date", startDate);
-  }
-
-  if (endDate) {
-    query = query.lte("date", endDate);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Supabase error:", error);
-    throw new Error(error.message);
-  }
-
-  return (data || []) as Appointment[];
-}
-
-function getDateString(offset: number) {
+function getDateString(offset = 0) {
   const date = new Date();
-
   date.setDate(date.getDate() + offset);
 
   const year = date.getFullYear();
@@ -125,33 +85,42 @@ function getDateString(offset: number) {
   return `${year}-${month}-${day}`;
 }
 
+async function getAppointments(
+  startDate?: string,
+  endDate?: string
+) {
+  let query = supabase
+    .from("appointments")
+    .select("id, name, phone, date, time, service, price, status")
+    .neq("status", "cancelled")
+    .order("date", { ascending: true })
+    .order("time", { ascending: true });
+
+  if (startDate) query = query.gte("date", startDate);
+  if (endDate) query = query.lte("date", endDate);
+
+  const { data, error } = await query;
+
+  if (error) throw new Error(error.message);
+
+  return (data || []) as Appointment[];
+}
+
 async function showMenu(chatId: number) {
   await telegram("sendMessage", {
     chat_id: chatId,
-    text: "💈 Barber Admin Panel\n\nChoose an option:",
+    text: "💈 MMMEISSSA BARBER\n\nChoose an option:",
     reply_markup: {
       inline_keyboard: [
         [
-          {
-            text: "📅 Today",
-            callback_data: "today",
-          },
-          {
-            text: "📆 Tomorrow",
-            callback_data: "tomorrow",
-          },
+          { text: "📅 Today", callback_data: "today" },
+          { text: "📆 Tomorrow", callback_data: "tomorrow" },
         ],
         [
-          {
-            text: "📋 All Upcoming",
-            callback_data: "all",
-          },
+          { text: "📋 All Upcoming", callback_data: "all" },
         ],
         [
-          {
-            text: "📊 Statistics",
-            callback_data: "stats",
-          },
+          { text: "📊 Statistics", callback_data: "stats" },
         ],
       ],
     },
@@ -166,27 +135,19 @@ async function showAppointments(
   if (appointments.length === 0) {
     await telegram("sendMessage", {
       chat_id: chatId,
-      text: `${title}\n\n✅ No appointments found.`,
+      text: `${title}\n\n✅ No appointments.`,
       reply_markup: {
         inline_keyboard: [
-          [
-            {
-              text: "⬅️ Menu",
-              callback_data: "menu",
-            },
-          ],
+          [{ text: "⬅️ Menu", callback_data: "menu" }],
         ],
       },
     });
-
     return;
   }
 
   await telegram("sendMessage", {
     chat_id: chatId,
-    text: `${title}\n\n📋 ${appointments.length} appointment${
-      appointments.length === 1 ? "" : "s"
-    }:`,
+    text: `${title}\n\n📋 ${appointments.length} appointment${appointments.length === 1 ? "" : "s"}:`,
   });
 
   for (const appointment of appointments) {
@@ -212,10 +173,8 @@ async function showAppointments(
     reply_markup: {
       inline_keyboard: [
         [
-          {
-            text: "🔄 Refresh",
-            callback_data: "menu",
-          },
+          { text: "🔄 Refresh", callback_data: "menu" },
+          { text: "⬅️ Menu", callback_data: "menu" },
         ],
       ],
     },
@@ -223,58 +182,43 @@ async function showAppointments(
 }
 
 async function showStatistics(chatId: number) {
-  const today = getDateString(0);
+  const today = getDateString();
 
   const { data, error } = await supabase
     .from("appointments")
     .select("id, date, price, status")
     .neq("status", "cancelled");
 
-  if (error) {
-    console.error("Statistics error:", error);
-
-    await telegram("sendMessage", {
-      chat_id: chatId,
-      text: "❌ Failed to load statistics.",
-    });
-
-    return;
-  }
+  if (error) throw new Error(error.message);
 
   const appointments = data || [];
 
   const todayAppointments = appointments.filter(
-    (appointment) => appointment.date === today
-  );
-
-  const totalRevenue = appointments.reduce(
-    (sum, appointment) =>
-      sum + Number(appointment.price || 0),
-    0
+    (a) => a.date === today
   );
 
   const todayRevenue = todayAppointments.reduce(
-    (sum, appointment) =>
-      sum + Number(appointment.price || 0),
+    (sum, a) => sum + Number(a.price || 0),
+    0
+  );
+
+  const totalRevenue = appointments.reduce(
+    (sum, a) => sum + Number(a.price || 0),
     0
   );
 
   await telegram("sendMessage", {
     chat_id: chatId,
     text:
-      `📊 Barber Statistics\n\n` +
-      `📅 Today: ${todayAppointments.length} appointments\n` +
+      `📊 BARBER STATISTICS\n\n` +
+      `📅 Today: ${todayAppointments.length}\n` +
       `💰 Today revenue: $${todayRevenue.toFixed(2)}\n\n` +
-      `📋 Upcoming/active appointments: ${appointments.length}\n` +
-      `💵 Total booked revenue: $${totalRevenue.toFixed(2)}`,
+      `📋 Active appointments: ${appointments.length}\n` +
+      `💵 Booked revenue: $${totalRevenue.toFixed(2)}`,
     reply_markup: {
       inline_keyboard: [
-        [
-          {
-            text: "⬅️ Menu",
-            callback_data: "menu",
-          },
-        ],
+        [{ text: "🔄 Refresh", callback_data: "stats" }],
+        [{ text: "⬅️ Menu", callback_data: "menu" }],
       ],
     },
   });
@@ -282,8 +226,7 @@ async function showStatistics(chatId: number) {
 
 export async function POST(request: Request) {
   try {
-    const update =
-      (await request.json()) as TelegramUpdate;
+    const update = (await request.json()) as TelegramUpdate;
 
     const chatId =
       update.message?.chat?.id ??
@@ -293,16 +236,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Only allow your Telegram account.
     if (String(chatId) !== String(ADMIN_CHAT_ID)) {
-      console.warn(
-        `Unauthorized Telegram chat: ${chatId}`
-      );
-
       return NextResponse.json({ ok: true });
     }
 
-    // Handle buttons.
     if (update.callback_query) {
       const callback = update.callback_query;
       const data = callback.data || "";
@@ -313,22 +250,16 @@ export async function POST(request: Request) {
 
       if (data === "menu") {
         await showMenu(chatId);
-
         return NextResponse.json({ ok: true });
       }
 
       if (data === "today") {
-        const today = getDateString(0);
-
-        const appointments = await getAppointments(
-          today,
-          today
-        );
+        const today = getDateString();
 
         await showAppointments(
           chatId,
-          appointments,
-          `📅 Today — ${today}`
+          await getAppointments(today, today),
+          `📅 TODAY — ${today}`
         );
 
         return NextResponse.json({ ok: true });
@@ -337,30 +268,22 @@ export async function POST(request: Request) {
       if (data === "tomorrow") {
         const tomorrow = getDateString(1);
 
-        const appointments = await getAppointments(
-          tomorrow,
-          tomorrow
-        );
-
         await showAppointments(
           chatId,
-          appointments,
-          `📆 Tomorrow — ${tomorrow}`
+          await getAppointments(tomorrow, tomorrow),
+          `📆 TOMORROW — ${tomorrow}`
         );
 
         return NextResponse.json({ ok: true });
       }
 
       if (data === "all") {
-        const today = getDateString(0);
-
-        const appointments =
-          await getAppointments(today);
+        const today = getDateString();
 
         await showAppointments(
           chatId,
-          appointments,
-          "📋 All Upcoming Appointments"
+          await getAppointments(today),
+          "📋 ALL UPCOMING APPOINTMENTS"
         );
 
         return NextResponse.json({ ok: true });
@@ -368,22 +291,17 @@ export async function POST(request: Request) {
 
       if (data === "stats") {
         await showStatistics(chatId);
-
         return NextResponse.json({ ok: true });
       }
 
       if (data.startsWith("cancel:")) {
-        const appointmentId =
-          data.replace("cancel:", "");
+        const appointmentId = data.replace("cancel:", "");
 
-        const { data: appointment, error } =
-          await supabase
-            .from("appointments")
-            .select(
-              "id, name, phone, date, time, service, price, status"
-            )
-            .eq("id", appointmentId)
-            .single();
+        const { data: appointment, error } = await supabase
+          .from("appointments")
+          .select("id, name, phone, date, time, service, price, status")
+          .eq("id", appointmentId)
+          .single();
 
         if (error || !appointment) {
           await telegram("sendMessage", {
@@ -397,28 +315,21 @@ export async function POST(request: Request) {
         if (appointment.status === "cancelled") {
           await telegram("sendMessage", {
             chat_id: chatId,
-            text:
-              "⚠️ This appointment is already cancelled.",
+            text: "⚠️ Already cancelled.",
           });
 
           return NextResponse.json({ ok: true });
         }
 
-        const { error: updateError } =
-          await supabase
-            .from("appointments")
-            .update({
-              status: "cancelled",
-            })
-            .eq("id", appointmentId);
+        const { error: updateError } = await supabase
+          .from("appointments")
+          .update({ status: "cancelled" })
+          .eq("id", appointmentId);
 
         if (updateError) {
-          console.error(updateError);
-
           await telegram("sendMessage", {
             chat_id: chatId,
-            text:
-              "❌ Failed to cancel appointment.",
+            text: "❌ Failed to cancel appointment.",
           });
 
           return NextResponse.json({ ok: true });
@@ -427,16 +338,11 @@ export async function POST(request: Request) {
         await telegram("sendMessage", {
           chat_id: chatId,
           text:
-            `✅ Appointment cancelled.\n\n` +
+            `✅ APPOINTMENT CANCELLED\n\n` +
             formatAppointment(appointment),
           reply_markup: {
             inline_keyboard: [
-              [
-                {
-                  text: "⬅️ Menu",
-                  callback_data: "menu",
-                },
-              ],
+              [{ text: "⬅️ Menu", callback_data: "menu" }],
             ],
           },
         });
@@ -447,34 +353,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /start and /menu.
     const text = update.message?.text || "";
 
-    if (
-      text === "/start" ||
-      text === "/menu"
-    ) {
+    if (text === "/start" || text === "/menu") {
       await showMenu(chatId);
-
-      return NextResponse.json({ ok: true });
+    } else {
+      await showMenu(chatId);
     }
-
-    await showMenu(chatId);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error(
-      "Telegram webhook error:",
-      error
-    );
+    console.error("Telegram webhook error:", error);
 
     return NextResponse.json(
-      {
-        error: "Something went wrong.",
-      },
-      {
-        status: 500,
-      }
+      { error: "Something went wrong." },
+      { status: 500 }
     );
   }
 }
