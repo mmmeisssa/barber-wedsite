@@ -62,8 +62,13 @@ function timeToMinutes(time: string) {
   const [clock, period] = time.split(" ");
   let [hour] = clock.split(":").map(Number);
 
-  if (period === "PM" && hour !== 12) hour += 12;
-  if (period === "AM" && hour === 12) hour = 0;
+  if (period === "PM" && hour !== 12) {
+    hour += 12;
+  }
+
+  if (period === "AM" && hour === 12) {
+    hour = 0;
+  }
 
   return hour * 60;
 }
@@ -115,7 +120,9 @@ export default function BookingPage() {
         setMessage(`Error: ${error.message}`);
         setBookedTimes([]);
       } else {
-        setBookedTimes((data || []).map((item) => item.time));
+        setBookedTimes(
+          (data || []).map((item) => item.time)
+        );
       }
 
       setLoadingTimes(false);
@@ -155,12 +162,16 @@ export default function BookingPage() {
     }
 
     if (!name.trim() || !phone.trim()) {
-      setMessage("Please enter your name and phone number.");
+      setMessage(
+        "Please enter your name and phone number."
+      );
       return;
     }
 
     if (bookedTimes.includes(selectedTime)) {
-      setMessage("Sorry, this time is already booked.");
+      setMessage(
+        "Sorry, this time is already booked."
+      );
       return;
     }
 
@@ -171,7 +182,6 @@ export default function BookingPage() {
 
     setLoading(true);
 
-    // Create appointment
     const { error } = await supabase
       .from("appointments")
       .insert({
@@ -186,35 +196,69 @@ export default function BookingPage() {
 
     if (error) {
       console.error(error);
-      setMessage(`Error: ${error.message}`);
+
+      // PostgreSQL unique constraint:
+      // another customer booked this exact date/time first.
+      if (error.code === "23505") {
+        setMessage(
+          "Sorry, this time was just booked. Please choose another time."
+        );
+
+        // Refresh booked times.
+        const { data: freshBookedTimes } =
+          await supabase
+            .from("appointments")
+            .select("time")
+            .eq("date", selectedDate)
+            .neq("status", "cancelled");
+
+        setBookedTimes(
+          (freshBookedTimes || []).map(
+            (item) => item.time
+          )
+        );
+
+        setSelectedTime("");
+      } else {
+        setMessage(
+          `Error: ${error.message}`
+        );
+      }
+
       setLoading(false);
       return;
     }
 
-    // Mark time as booked in the UI
-    setBookedTimes((current) => [...current, selectedTime]);
+    // Mark time as booked in the UI.
+    setBookedTimes((current) => [
+      ...current,
+      selectedTime,
+    ]);
 
-    // Show success immediately
+    // Show success immediately.
     setSuccess(true);
     setLoading(false);
     setMessage("");
 
-    // Send Telegram notification
+    // Send Telegram notification.
     try {
-      const telegramResponse = await fetch("/api/telegram", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          phone: phone.trim(),
-          service: service.name,
-          price: service.price,
-          date: selectedDate,
-          time: selectedTime,
-        }),
-      });
+      const telegramResponse = await fetch(
+        "/api/telegram",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: name.trim(),
+            phone: phone.trim(),
+            service: service.name,
+            price: service.price,
+            date: selectedDate,
+            time: selectedTime,
+          }),
+        }
+      );
 
       if (!telegramResponse.ok) {
         console.error(
@@ -275,7 +319,8 @@ export default function BookingPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               {services.map((item) => {
-                const selected = service?.name === item.name;
+                const selected =
+                  service?.name === item.name;
 
                 return (
                   <button
@@ -327,7 +372,9 @@ export default function BookingPage() {
             />
 
             {selectedDate &&
-              new Date(`${selectedDate}T12:00:00`).getDay() === 5 && (
+              new Date(
+                `${selectedDate}T12:00:00`
+              ).getDay() === 5 && (
                 <p className="mt-3 text-sm text-red-400">
                   Friday is closed.
                 </p>
@@ -336,118 +383,134 @@ export default function BookingPage() {
         )}
 
         {/* Times */}
-        {!success && service && selectedDate && (
-          <section className="mt-10">
-            <p className="mb-4 text-sm text-zinc-400">
-              3. Select time
-            </p>
-
-            {loadingTimes ? (
-              <p className="text-zinc-500">
-                Checking availability...
+        {!success &&
+          service &&
+          selectedDate && (
+            <section className="mt-10">
+              <p className="mb-4 text-sm text-zinc-400">
+                3. Select time
               </p>
-            ) : availableTimes.length === 0 ? (
-              <p className="text-zinc-500">
-                No appointments are available on this day.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {availableTimes.map((time) => {
-                  const booked = bookedTimes.includes(time);
-                  const passed = isTimePassed(time);
 
-                  return (
-                    <button
-                      key={time}
-                      type="button"
-                      disabled={booked || passed}
-                      onClick={() => {
-                        setSelectedTime(time);
-                        setMessage("");
-                      }}
-                      className={
-                        booked || passed
-                          ? "cursor-not-allowed rounded-xl border border-zinc-900 bg-zinc-950 px-4 py-4 text-zinc-700"
-                          : selectedTime === time
-                          ? "rounded-xl border border-white bg-white px-4 py-4 text-black"
-                          : "rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-4 transition hover:border-zinc-500"
-                      }
-                    >
-                      {booked
-                        ? "Booked"
-                        : passed
-                        ? "Passed"
-                        : time}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
+              {loadingTimes ? (
+                <p className="text-zinc-500">
+                  Checking availability...
+                </p>
+              ) : availableTimes.length === 0 ? (
+                <p className="text-zinc-500">
+                  No appointments are available on this day.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {availableTimes.map((time) => {
+                    const booked =
+                      bookedTimes.includes(time);
+
+                    const passed =
+                      isTimePassed(time);
+
+                    return (
+                      <button
+                        key={time}
+                        type="button"
+                        disabled={
+                          booked || passed
+                        }
+                        onClick={() => {
+                          setSelectedTime(time);
+                          setMessage("");
+                        }}
+                        className={
+                          booked || passed
+                            ? "cursor-not-allowed rounded-xl border border-zinc-900 bg-zinc-950 px-4 py-4 text-zinc-700"
+                            : selectedTime === time
+                              ? "rounded-xl border border-white bg-white px-4 py-4 text-black"
+                              : "rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-4 transition hover:border-zinc-500"
+                        }
+                      >
+                        {booked
+                          ? "Booked"
+                          : passed
+                            ? "Passed"
+                            : time}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
 
         {/* Customer */}
-        {!success && service && selectedDate && selectedTime && (
-          <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <p className="text-sm text-zinc-500">
-              4. Your information
-            </p>
-
-            <div className="mt-5 space-y-4">
-              <input
-                type="text"
-                placeholder="Your name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-black px-4 py-4 text-white outline-none placeholder:text-zinc-600 focus:border-white"
-              />
-
-              <input
-                type="tel"
-                placeholder="Phone number"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                className="w-full rounded-xl border border-zinc-800 bg-black px-4 py-4 text-white outline-none placeholder:text-zinc-600 focus:border-white"
-              />
-            </div>
-
-            {/* Summary */}
-            <div className="mt-6 rounded-xl border border-zinc-800 p-5">
+        {!success &&
+          service &&
+          selectedDate &&
+          selectedTime && (
+            <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
               <p className="text-sm text-zinc-500">
-                Appointment summary
+                4. Your information
               </p>
 
-              <div className="mt-3 space-y-1">
-                <p className="font-semibold">
-                  {service.name} — ${service.price}
-                </p>
+              <div className="mt-5 space-y-4">
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(event) =>
+                    setName(event.target.value)
+                  }
+                  className="w-full rounded-xl border border-zinc-800 bg-black px-4 py-4 text-white outline-none placeholder:text-zinc-600 focus:border-white"
+                />
 
-                <p className="text-zinc-400">
-                  {selectedDate}
-                </p>
-
-                <p className="text-zinc-400">
-                  {selectedTime}
-                </p>
+                <input
+                  type="tel"
+                  placeholder="Phone number"
+                  value={phone}
+                  onChange={(event) =>
+                    setPhone(event.target.value)
+                  }
+                  className="w-full rounded-xl border border-zinc-800 bg-black px-4 py-4 text-white outline-none placeholder:text-zinc-600 focus:border-white"
+                />
               </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={handleBooking}
-              disabled={loading}
-              className="mt-6 w-full rounded-xl bg-white py-4 font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
-            >
-              {loading ? "Booking..." : "Confirm Appointment"}
-            </button>
+              {/* Summary */}
+              <div className="mt-6 rounded-xl border border-zinc-800 p-5">
+                <p className="text-sm text-zinc-500">
+                  Appointment summary
+                </p>
 
-            {message && (
-              <p className="mt-4 text-center text-sm text-red-400">
-                {message}
-              </p>
-            )}
-          </section>
-        )}
+                <div className="mt-3 space-y-1">
+                  <p className="font-semibold">
+                    {service.name} — ${service.price}
+                  </p>
+
+                  <p className="text-zinc-400">
+                    {selectedDate}
+                  </p>
+
+                  <p className="text-zinc-400">
+                    {selectedTime}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleBooking}
+                disabled={loading}
+                className="mt-6 w-full rounded-xl bg-white py-4 font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
+              >
+                {loading
+                  ? "Booking..."
+                  : "Confirm Appointment"}
+              </button>
+
+              {message && (
+                <p className="mt-4 text-center text-sm text-red-400">
+                  {message}
+                </p>
+              )}
+            </section>
+          )}
 
         {/* Success */}
         {success && (
@@ -506,7 +569,6 @@ export default function BookingPage() {
             </div>
           </section>
         )}
-
       </div>
     </main>
   );
