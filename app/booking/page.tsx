@@ -69,9 +69,9 @@ function timeToMinutes(time: string) {
 }
 
 export default function BookingPage() {
-  const [service, setService] = useState<(typeof services)[number] | null>(
-    null
-  );
+  const [service, setService] = useState<
+    (typeof services)[number] | null
+  >(null);
 
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
@@ -129,7 +129,10 @@ export default function BookingPage() {
 
     const now = new Date();
 
-    return timeToMinutes(time) <= now.getHours() * 60 + now.getMinutes();
+    return (
+      timeToMinutes(time) <=
+      now.getHours() * 60 + now.getMinutes()
+    );
   };
 
   const handleBooking = async () => {
@@ -168,15 +171,18 @@ export default function BookingPage() {
 
     setLoading(true);
 
-    const { error } = await supabase.from("appointments").insert({
-      name: name.trim(),
-      phone: phone.trim(),
-      date: selectedDate,
-      time: selectedTime,
-      service: service.name,
-      price: service.price,
-      status: "confirmed",
-    });
+    // Create appointment
+    const { error } = await supabase
+      .from("appointments")
+      .insert({
+        name: name.trim(),
+        phone: phone.trim(),
+        date: selectedDate,
+        time: selectedTime,
+        service: service.name,
+        price: service.price,
+        status: "confirmed",
+      });
 
     if (error) {
       console.error(error);
@@ -185,11 +191,43 @@ export default function BookingPage() {
       return;
     }
 
+    // Mark time as booked in the UI
+    setBookedTimes((current) => [...current, selectedTime]);
+
+    // Show success immediately
     setSuccess(true);
     setLoading(false);
     setMessage("");
 
-    setBookedTimes((current) => [...current, selectedTime]);
+    // Send Telegram notification
+    try {
+      const telegramResponse = await fetch("/api/telegram", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          service: service.name,
+          price: service.price,
+          date: selectedDate,
+          time: selectedTime,
+        }),
+      });
+
+      if (!telegramResponse.ok) {
+        console.error(
+          "Telegram notification failed:",
+          await telegramResponse.text()
+        );
+      }
+    } catch (telegramError) {
+      console.error(
+        "Telegram notification error:",
+        telegramError
+      );
+    }
   };
 
   return (
@@ -335,7 +373,11 @@ export default function BookingPage() {
                           : "rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-4 transition hover:border-zinc-500"
                       }
                     >
-                      {booked ? "Booked" : passed ? "Passed" : time}
+                      {booked
+                        ? "Booked"
+                        : passed
+                        ? "Passed"
+                        : time}
                     </button>
                   );
                 })}
