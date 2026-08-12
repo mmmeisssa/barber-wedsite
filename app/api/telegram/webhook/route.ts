@@ -64,6 +64,13 @@ async function telegram(
 }
 
 function formatAppointment(appointment: Appointment) {
+  const status =
+    appointment.status === "confirmed"
+      ? "🟢 Confirmed"
+      : appointment.status === "cancelled"
+        ? "🔴 Cancelled"
+        : `🟡 ${appointment.status}`;
+
   return [
     `👤 ${appointment.name}`,
     `📞 ${appointment.phone}`,
@@ -71,7 +78,7 @@ function formatAppointment(appointment: Appointment) {
     `💰 $${appointment.price ?? 0}`,
     `📅 ${appointment.date}`,
     `⏰ ${appointment.time}`,
-    `🟢 ${appointment.status}`,
+    status,
   ].join("\n");
 }
 
@@ -140,6 +147,12 @@ async function showMenu(chatId: number) {
             callback_data: "all",
           },
         ],
+        [
+          {
+            text: "📊 Statistics",
+            callback_data: "stats",
+          },
+        ],
       ],
     },
   });
@@ -153,11 +166,28 @@ async function showAppointments(
   if (appointments.length === 0) {
     await telegram("sendMessage", {
       chat_id: chatId,
-      text: `${title}\n\nNo appointments found.`,
+      text: `${title}\n\n✅ No appointments found.`,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "⬅️ Menu",
+              callback_data: "menu",
+            },
+          ],
+        ],
+      },
     });
 
     return;
   }
+
+  await telegram("sendMessage", {
+    chat_id: chatId,
+    text: `${title}\n\n📋 ${appointments.length} appointment${
+      appointments.length === 1 ? "" : "s"
+    }:`,
+  });
 
   for (const appointment of appointments) {
     await telegram("sendMessage", {
@@ -178,14 +208,70 @@ async function showAppointments(
 
   await telegram("sendMessage", {
     chat_id: chatId,
-    text: `${title}\n\n${appointments.length} appointment${
-      appointments.length === 1 ? "" : "s"
-    }.`,
+    text: "What would you like to do?",
     reply_markup: {
       inline_keyboard: [
         [
           {
             text: "🔄 Refresh",
+            callback_data: "menu",
+          },
+        ],
+      ],
+    },
+  });
+}
+
+async function showStatistics(chatId: number) {
+  const today = getDateString(0);
+
+  const { data, error } = await supabase
+    .from("appointments")
+    .select("id, date, price, status")
+    .neq("status", "cancelled");
+
+  if (error) {
+    console.error("Statistics error:", error);
+
+    await telegram("sendMessage", {
+      chat_id: chatId,
+      text: "❌ Failed to load statistics.",
+    });
+
+    return;
+  }
+
+  const appointments = data || [];
+
+  const todayAppointments = appointments.filter(
+    (appointment) => appointment.date === today
+  );
+
+  const totalRevenue = appointments.reduce(
+    (sum, appointment) =>
+      sum + Number(appointment.price || 0),
+    0
+  );
+
+  const todayRevenue = todayAppointments.reduce(
+    (sum, appointment) =>
+      sum + Number(appointment.price || 0),
+    0
+  );
+
+  await telegram("sendMessage", {
+    chat_id: chatId,
+    text:
+      `📊 Barber Statistics\n\n` +
+      `📅 Today: ${todayAppointments.length} appointments\n` +
+      `💰 Today revenue: $${todayRevenue.toFixed(2)}\n\n` +
+      `📋 Upcoming/active appointments: ${appointments.length}\n` +
+      `💵 Total booked revenue: $${totalRevenue.toFixed(2)}`,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: "⬅️ Menu",
             callback_data: "menu",
           },
         ],
@@ -207,7 +293,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Security: only allow your Telegram account.
+    // Only allow your Telegram account.
     if (String(chatId) !== String(ADMIN_CHAT_ID)) {
       console.warn(
         `Unauthorized Telegram chat: ${chatId}`
@@ -227,6 +313,7 @@ export async function POST(request: Request) {
 
       if (data === "menu") {
         await showMenu(chatId);
+
         return NextResponse.json({ ok: true });
       }
 
@@ -279,6 +366,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
+      if (data === "stats") {
+        await showStatistics(chatId);
+
+        return NextResponse.json({ ok: true });
+      }
+
       if (data.startsWith("cancel:")) {
         const appointmentId =
           data.replace("cancel:", "");
@@ -304,7 +397,8 @@ export async function POST(request: Request) {
         if (appointment.status === "cancelled") {
           await telegram("sendMessage", {
             chat_id: chatId,
-            text: "⚠️ This appointment is already cancelled.",
+            text:
+              "⚠️ This appointment is already cancelled.",
           });
 
           return NextResponse.json({ ok: true });
@@ -323,7 +417,8 @@ export async function POST(request: Request) {
 
           await telegram("sendMessage", {
             chat_id: chatId,
-            text: "❌ Failed to cancel appointment.",
+            text:
+              "❌ Failed to cancel appointment.",
           });
 
           return NextResponse.json({ ok: true });
@@ -334,6 +429,16 @@ export async function POST(request: Request) {
           text:
             `✅ Appointment cancelled.\n\n` +
             formatAppointment(appointment),
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "⬅️ Menu",
+                  callback_data: "menu",
+                },
+              ],
+            ],
+          },
         });
 
         return NextResponse.json({ ok: true });
@@ -342,10 +447,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /start and normal messages.
+    // Handle /start and /menu.
     const text = update.message?.text || "";
 
-    if (text === "/start" || text === "/menu") {
+    if (
+      text === "/start" ||
+      text === "/menu"
+    ) {
       await showMenu(chatId);
 
       return NextResponse.json({ ok: true });
@@ -355,7 +463,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Telegram webhook error:", error);
+    console.error(
+      "Telegram webhook error:",
+      error
+    );
 
     return NextResponse.json(
       {
