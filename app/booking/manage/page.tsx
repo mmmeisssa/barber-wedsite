@@ -33,20 +33,20 @@ function canCancel(date: string, time: string) {
   const appointmentDate = getAppointmentDate(date, time);
   const now = new Date();
 
-  const difference = appointmentDate.getTime() - now.getTime();
-
-  return difference >= 30 * 60 * 1000;
+  return appointmentDate.getTime() - now.getTime() >= 30 * 60 * 1000;
 }
 
 function formatDate(date: string) {
-  const value = new Date(`${date}T12:00:00`);
-
-  return value.toLocaleDateString("en-US", {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
   });
+}
+
+function cleanPhone(phone: string) {
+  return phone.replace(/\D/g, "");
 }
 
 export default function ManageBookingPage() {
@@ -64,70 +64,57 @@ export default function ManageBookingPage() {
     setSearched(false);
     setAppointments([]);
 
-    if (!phone.trim()) {
+    const searchPhone = cleanPhone(phone);
+
+    if (!searchPhone) {
       setMessage("Please enter your phone number.");
       return;
     }
 
     setLoading(true);
 
-    const cleanPhone = phone.replace(/\D/g, "");
-
     const { data, error } = await supabase
       .from("appointments")
       .select(
         "id, name, phone, date, time, service, price, status"
       )
-      .eq("phone", phone.trim())
       .neq("status", "cancelled")
       .order("date", { ascending: true })
       .order("time", { ascending: true });
 
-    let results = data;
-
-    // If exact phone formatting doesn't match,
-    // try a digits-only comparison on the returned possibilities.
-    if (!error && (!results || results.length === 0)) {
-      const { data: allData, error: allError } = await supabase
-        .from("appointments")
-        .select(
-          "id, name, phone, date, time, service, price, status"
-        )
-        .neq("status", "cancelled")
-        .order("date", { ascending: true })
-        .order("time", { ascending: true });
-
-      if (!allError) {
-        results = (allData || []).filter(
-          (appointment) =>
-            appointment.phone.replace(/\D/g, "") === cleanPhone
-        );
-      }
-    }
-
-    if (error && !results) {
+    if (error) {
+      console.error(error);
       setMessage(`Error: ${error.message}`);
       setLoading(false);
       return;
     }
 
+    const matchingAppointments = (data || []).filter(
+      (appointment) =>
+        cleanPhone(appointment.phone) === searchPhone
+    );
+
     const now = new Date();
 
-    const futureAppointments = (results || []).filter((appointment) => {
-      const appointmentDate = getAppointmentDate(
-        appointment.date,
-        appointment.time
-      );
+    const futureAppointments = matchingAppointments.filter(
+      (appointment) => {
+        const appointmentDate = getAppointmentDate(
+          appointment.date,
+          appointment.time
+        );
 
-      return appointmentDate > now;
-    });
+        return appointmentDate > now;
+      }
+    );
 
     setAppointments(futureAppointments);
     setSearched(true);
     setLoading(false);
   };
 
-  const cancelAppointment = async (appointment: Appointment) => {
+  const cancelAppointment = async (
+    appointment: Appointment
+  ) => {
     setMessage("");
 
     if (!canCancel(appointment.date, appointment.time)) {
@@ -138,9 +125,11 @@ export default function ManageBookingPage() {
     }
 
     const confirmed = window.confirm(
-      `Cancel your ${appointment.service || "appointment"} on ${formatDate(
-        appointment.date
-      )} at ${appointment.time}?`
+      `Cancel your ${
+        appointment.service || "appointment"
+      } on ${formatDate(appointment.date)} at ${
+        appointment.time
+      }?`
     );
 
     if (!confirmed) return;
@@ -172,7 +161,6 @@ export default function ManageBookingPage() {
   return (
     <main className="min-h-screen bg-black px-6 py-10 text-white md:px-12">
       <div className="mx-auto max-w-3xl">
-
         <a
           href="/booking"
           className="text-sm text-zinc-500 transition hover:text-white"
@@ -190,13 +178,12 @@ export default function ManageBookingPage() {
           </h1>
 
           <p className="mt-4 max-w-xl text-zinc-400">
-            Enter the phone number you used when booking to view or cancel
-            your appointment.
+            Enter the phone number you used when booking to
+            view or cancel your appointment.
           </p>
         </div>
 
         <div className="mt-10 rounded-3xl border border-zinc-800 bg-zinc-900 p-6 md:p-8">
-
           <label className="block">
             <span className="mb-2 block text-sm text-zinc-400">
               Phone number
@@ -206,7 +193,9 @@ export default function ManageBookingPage() {
               type="tel"
               placeholder="(929) 585-9392"
               value={phone}
-              onChange={(event) => setPhone(event.target.value)}
+              onChange={(event) =>
+                setPhone(event.target.value)
+              }
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   findAppointments();
@@ -222,7 +211,9 @@ export default function ManageBookingPage() {
             disabled={loading}
             className="mt-4 w-full rounded-xl bg-white py-4 font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
           >
-            {loading ? "Searching..." : "Find My Appointment"}
+            {loading
+              ? "Searching..."
+              : "Find My Appointment"}
           </button>
         </div>
 
@@ -232,22 +223,23 @@ export default function ManageBookingPage() {
           </div>
         )}
 
-        {searched && appointments.length === 0 && !message && (
-          <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-            <p className="text-lg font-semibold">
-              No upcoming appointments found.
-            </p>
+        {searched &&
+          appointments.length === 0 &&
+          !message && (
+            <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center">
+              <p className="text-lg font-semibold">
+                No upcoming appointments found.
+              </p>
 
-            <p className="mt-2 text-sm text-zinc-500">
-              Check that you entered the same phone number used for your
-              booking.
-            </p>
-          </div>
-        )}
+              <p className="mt-2 text-sm text-zinc-500">
+                Check that you entered the same phone number
+                used for your booking.
+              </p>
+            </div>
+          )}
 
         {appointments.length > 0 && (
           <div className="mt-8 space-y-4">
-
             {appointments.map((appointment) => {
               const allowed = canCancel(
                 appointment.date,
@@ -260,14 +252,14 @@ export default function ManageBookingPage() {
                   className="rounded-3xl border border-zinc-800 bg-zinc-900 p-6 md:p-8"
                 >
                   <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-
                     <div>
                       <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">
                         Confirmed
                       </p>
 
                       <h2 className="mt-2 text-2xl font-bold">
-                        {appointment.service || "Appointment"}
+                        {appointment.service ||
+                          "Appointment"}
                       </h2>
 
                       <p className="mt-2 text-zinc-400">
@@ -289,8 +281,8 @@ export default function ManageBookingPage() {
                       {allowed ? (
                         <>
                           <p className="mb-3 text-xs text-zinc-500">
-                            Free cancellation until 30 minutes before
-                            appointment
+                            Free cancellation until 30 minutes
+                            before appointment
                           </p>
 
                           <button
@@ -299,11 +291,13 @@ export default function ManageBookingPage() {
                               cancelAppointment(appointment)
                             }
                             disabled={
-                              cancellingId === appointment.id
+                              cancellingId ===
+                              appointment.id
                             }
                             className="rounded-full border border-red-900 px-5 py-3 text-sm font-semibold text-red-400 transition hover:bg-red-950 disabled:opacity-50"
                           >
-                            {cancellingId === appointment.id
+                            {cancellingId ===
+                            appointment.id
                               ? "Cancelling..."
                               : "Cancel Appointment"}
                           </button>
@@ -316,12 +310,10 @@ export default function ManageBookingPage() {
                         </div>
                       )}
                     </div>
-
                   </div>
                 </div>
               );
             })}
-
           </div>
         )}
 
@@ -333,7 +325,6 @@ export default function ManageBookingPage() {
             Need a new appointment? Book here →
           </a>
         </div>
-
       </div>
     </main>
   );
