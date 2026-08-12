@@ -126,10 +126,13 @@ async function getAppointments(
 
   const appointments = (data || []) as Appointment[];
 
-  // Sort appointments by real time.
-  appointments.sort(
-    (a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)
-  );
+  appointments.sort((a, b) => {
+    if (a.date !== b.date) {
+      return a.date.localeCompare(b.date);
+    }
+
+    return timeToMinutes(a.time) - timeToMinutes(b.time);
+  });
 
   return appointments;
 }
@@ -314,7 +317,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Only allow your Telegram account.
     if (String(chatId) !== String(ADMIN_CHAT_ID)) {
       console.warn(
         `Unauthorized Telegram chat: ${chatId}`
@@ -323,7 +325,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Handle buttons.
     if (update.callback_query) {
       const callback = update.callback_query;
       const data = callback.data || "";
@@ -393,7 +394,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      // Cancel appointment.
       if (data.startsWith("cancel:")) {
         const appointmentId =
           data.replace("cancel:", "");
@@ -469,7 +469,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /start and /menu.
     const text = update.message?.text || "";
 
     if (
