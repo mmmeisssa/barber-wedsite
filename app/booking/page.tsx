@@ -197,14 +197,11 @@ export default function BookingPage() {
     if (error) {
       console.error(error);
 
-      // PostgreSQL unique constraint:
-      // another customer booked this exact date/time first.
       if (error.code === "23505") {
         setMessage(
           "Sorry, this time was just booked. Please choose another time."
         );
 
-        // Refresh booked times.
         const { data: freshBookedTimes } =
           await supabase
             .from("appointments")
@@ -220,27 +217,22 @@ export default function BookingPage() {
 
         setSelectedTime("");
       } else {
-        setMessage(
-          `Error: ${error.message}`
-        );
+        setMessage(`Error: ${error.message}`);
       }
 
       setLoading(false);
       return;
     }
 
-    // Mark time as booked in the UI.
     setBookedTimes((current) => [
       ...current,
       selectedTime,
     ]);
 
-    // Show success immediately.
     setSuccess(true);
     setLoading(false);
     setMessage("");
 
-    // Send Telegram notification.
     try {
       const telegramResponse = await fetch(
         "/api/telegram",
@@ -278,7 +270,6 @@ export default function BookingPage() {
     <main className="min-h-screen bg-black px-6 py-10 text-white md:px-12">
       <div className="mx-auto max-w-3xl">
 
-        {/* Top navigation */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <a
             href="/"
@@ -295,7 +286,6 @@ export default function BookingPage() {
           </a>
         </div>
 
-        {/* Header */}
         <div className="mt-12">
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
             Book appointment
@@ -310,7 +300,6 @@ export default function BookingPage() {
           </p>
         </div>
 
-        {/* Services */}
         {!success && (
           <section className="mt-12">
             <p className="mb-4 text-sm text-zinc-400">
@@ -352,7 +341,6 @@ export default function BookingPage() {
           </section>
         )}
 
-        {/* Date */}
         {!success && service && (
           <section className="mt-10">
             <p className="mb-4 text-sm text-zinc-400">
@@ -382,7 +370,6 @@ export default function BookingPage() {
           </section>
         )}
 
-        {/* Times */}
         {!success &&
           service &&
           selectedDate && (
@@ -440,7 +427,6 @@ export default function BookingPage() {
             </section>
           )}
 
-        {/* Customer */}
         {!success &&
           service &&
           selectedDate &&
@@ -472,7 +458,6 @@ export default function BookingPage() {
                 />
               </div>
 
-              {/* Summary */}
               <div className="mt-6 rounded-xl border border-zinc-800 p-5">
                 <p className="text-sm text-zinc-500">
                   Appointment summary
@@ -512,7 +497,6 @@ export default function BookingPage() {
             </section>
           )}
 
-        {/* Success */}
         {success && (
           <section className="mt-12 rounded-3xl border border-zinc-800 bg-zinc-900 p-8 text-center md:p-12">
             <div className="text-5xl">✓</div>
