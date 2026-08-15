@@ -120,9 +120,7 @@ export default function BookingPage() {
         setMessage(`Error: ${error.message}`);
         setBookedTimes([]);
       } else {
-        setBookedTimes(
-          (data || []).map((item) => item.time)
-        );
+        setBookedTimes((data || []).map((item) => item.time));
       }
 
       setLoadingTimes(false);
@@ -162,16 +160,12 @@ export default function BookingPage() {
     }
 
     if (!name.trim() || !phone.trim()) {
-      setMessage(
-        "Please enter your name and phone number."
-      );
+      setMessage("Please enter your name and phone number.");
       return;
     }
 
     if (bookedTimes.includes(selectedTime)) {
-      setMessage(
-        "Sorry, this time is already booked."
-      );
+      setMessage("Sorry, this time is already booked.");
       return;
     }
 
@@ -202,17 +196,14 @@ export default function BookingPage() {
           "Sorry, this time was just booked. Please choose another time."
         );
 
-        const { data: freshBookedTimes } =
-          await supabase
-            .from("appointments")
-            .select("time")
-            .eq("date", selectedDate)
-            .neq("status", "cancelled");
+        const { data: freshBookedTimes } = await supabase
+          .from("appointments")
+          .select("time")
+          .eq("date", selectedDate)
+          .neq("status", "cancelled");
 
         setBookedTimes(
-          (freshBookedTimes || []).map(
-            (item) => item.time
-          )
+          (freshBookedTimes || []).map((item) => item.time)
         );
 
         setSelectedTime("");
@@ -234,23 +225,20 @@ export default function BookingPage() {
     setMessage("");
 
     try {
-      const telegramResponse = await fetch(
-        "/api/telegram",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: name.trim(),
-            phone: phone.trim(),
-            service: service.name,
-            price: service.price,
-            date: selectedDate,
-            time: selectedTime,
-          }),
-        }
-      );
+      const telegramResponse = await fetch("/api/telegram", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim(),
+          service: service.name,
+          price: service.price,
+          date: selectedDate,
+          time: selectedTime,
+        }),
+      });
 
       if (!telegramResponse.ok) {
         console.error(
@@ -270,7 +258,8 @@ export default function BookingPage() {
     <main className="min-h-screen bg-black px-6 py-10 text-white md:px-12">
       <div className="mx-auto max-w-3xl">
 
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* Top navigation */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <a
             href="/"
             className="text-sm text-zinc-500 transition hover:text-white"
@@ -278,14 +267,26 @@ export default function BookingPage() {
             ← Back to website
           </a>
 
-          <a
-            href="/booking/manage"
-            className="rounded-full border border-zinc-700 px-5 py-2.5 text-sm font-semibold transition hover:border-white hover:bg-zinc-900"
-          >
-            Manage Booking
-          </a>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="https://www.instagram.com/mmmeisssa.barber/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-zinc-700 px-5 py-2.5 text-sm font-semibold transition hover:border-white hover:bg-zinc-900"
+            >
+              Instagram
+            </a>
+
+            <a
+              href="/booking/manage"
+              className="rounded-full border border-zinc-700 px-5 py-2.5 text-sm font-semibold transition hover:border-white hover:bg-zinc-900"
+            >
+              Manage Booking
+            </a>
+          </div>
         </div>
 
+        {/* Header */}
         <div className="mt-12">
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
             Book appointment
@@ -300,6 +301,7 @@ export default function BookingPage() {
           </p>
         </div>
 
+        {/* Services */}
         {!success && (
           <section className="mt-12">
             <p className="mb-4 text-sm text-zinc-400">
@@ -308,8 +310,7 @@ export default function BookingPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               {services.map((item) => {
-                const selected =
-                  service?.name === item.name;
+                const selected = service?.name === item.name;
 
                 return (
                   <button
@@ -341,6 +342,7 @@ export default function BookingPage() {
           </section>
         )}
 
+        {/* Date */}
         {!success && service && (
           <section className="mt-10">
             <p className="mb-4 text-sm text-zinc-400">
@@ -370,6 +372,7 @@ export default function BookingPage() {
           </section>
         )}
 
+        {/* Times */}
         {!success &&
           service &&
           selectedDate && (
@@ -399,9 +402,7 @@ export default function BookingPage() {
                       <button
                         key={time}
                         type="button"
-                        disabled={
-                          booked || passed
-                        }
+                        disabled={booked || passed}
                         onClick={() => {
                           setSelectedTime(time);
                           setMessage("");
@@ -427,6 +428,7 @@ export default function BookingPage() {
             </section>
           )}
 
+        {/* Customer */}
         {!success &&
           service &&
           selectedDate &&
@@ -458,6 +460,7 @@ export default function BookingPage() {
                 />
               </div>
 
+              {/* Summary */}
               <div className="mt-6 rounded-xl border border-zinc-800 p-5">
                 <p className="text-sm text-zinc-500">
                   Appointment summary
@@ -497,6 +500,7 @@ export default function BookingPage() {
             </section>
           )}
 
+        {/* Success */}
         {success && (
           <section className="mt-12 rounded-3xl border border-zinc-800 bg-zinc-900 p-8 text-center md:p-12">
             <div className="text-5xl">✓</div>
@@ -535,6 +539,15 @@ export default function BookingPage() {
                 className="rounded-full bg-white px-6 py-3 font-semibold text-black"
               >
                 Back to website
+              </a>
+
+              <a
+                href="https://www.instagram.com/mmmeisssa.barber/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full border border-zinc-700 px-6 py-3 font-semibold transition hover:bg-zinc-800"
+              >
+                Instagram
               </a>
 
               <a
