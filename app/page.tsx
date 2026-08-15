@@ -65,10 +65,10 @@ export default function Home() {
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Service name="Haircut" price="$30" />
-<Service name="Kids Haircut" price="$25" />
-<Service name="Haircut + Beard" price="$40" />
-<Service name="Beard Cleanup" price="$15" />
+          <Service name="Haircut" price="$30" />
+          <Service name="Kids Haircut" price="$25" />
+          <Service name="Haircut + Beard" price="$40" />
+          <Service name="Beard Cleanup" price="$15" />
         </div>
       </section>
 
@@ -140,6 +140,15 @@ export default function Home() {
                 className="rounded-full border border-zinc-700 px-6 py-3 font-semibold transition hover:bg-zinc-900"
               >
                 Text Me
+              </a>
+
+              <a
+                href="https://www.instagram.com/mmmeisssa.barber/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full border border-zinc-700 px-6 py-3 font-semibold transition hover:bg-zinc-900"
+              >
+                Instagram
               </a>
             </div>
           </div>
